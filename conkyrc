@@ -77,11 +77,14 @@ TEXT
             ${endif} 
     },
     {
-        "full_text": "v ${exec amixer -D pulse get 'Master' | grep -oP '(?<=\[)\d+%(?=\])' | head -n 1 }" 
+        "full_text": "${exec ~/.config/i3/bin/pacvol.sh display}",
+	"color": "\#ffffff" 
     },
 	
     {
         "full_text": "${time %V %A, %B %d,%Y}  ${time %H:%M:%S} ",
-        "color": ${if_match ${time %u}>5}"\#00CC00"${else}"\#75C4F4"${endif}
+        "color":${if_match ${time %u}>5}"\#00CC00"${else}
+			"\#75C4F4"
+		${endif}
     }
 ],
