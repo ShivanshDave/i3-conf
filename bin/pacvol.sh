@@ -16,7 +16,7 @@ MUTED=0
 MUTED=`pacmd list-sinks 0 | grep muted | cut -d ' ' -f 2`
 #VOLPERC=`pactl list sinks | awk '/Volume: 0:/ {print substr($3, 1, index($3, "%") - 1)}' | head -n1`
 VOLPERC=`pactl list sinks | awk '/Volume: front-left:/ {print substr($5, 1, index($5, "%") - 1)}'`
-SKIPOVERCHECK=1
+SKIPOVERCHECK=0 # 1 : to increase volume beyond 100%
 
 display(){
   if [ "$MUTED" = "yes" ]; then
@@ -36,7 +36,6 @@ up(){
 
 down(){
 	VOLSTEP="$(( $VOLPERC-$STEP ))";
-	SKIPOVERCHECK=1
 }
 
 max(){
@@ -107,19 +106,19 @@ esac
 
 VOLUME="$(( ($MAXVOL/100) * $VOLSTEP ))"
 
-echo "$VOLUME : $OVERMAX"
+#echo "$VOLUME : $OVERMAX"
 
- if [ -z $SKIPOVERCHECK ]; then
- 	if [ $VOLUME -gt $MAXVOL ]; then
+if [ $SKIPOVERCHECK = 0 ]; then
+	if [ $VOLUME -gt $MAXVOL ]; then
  		VOLUME=$MAXVOL
  	elif [ $VOLUME -lt 0 ]; then
  		VOLUME=0
  	fi
- fi
+fi
 
 #echo "$VOLUME: $MAXVOL/100 * $VOLPERC+$VOLSTEP"
 pacmd set-sink-volume $SINK $VOLUME > /dev/null
-# VOLPERC=`pacmd list-sinks | grep "volume" | head -n1 | cut -d: -f3 | cut -d% -f1 | tr -d "[:space:]"`
 
+# VOLPERC=`pacmd list-sinks | grep "volume" | head -n1 | cut -d: -f3 | cut -d% -f1 | tr -d "[:space:]"`
 #osd_cat -b percentage -P $VOLPERC --delay=1 --align=center --pos bottom --offset 50 --color=green&
 
