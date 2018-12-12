@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 # PulseAudio Volume Control Script
 #   2010-05-20 - Gary Hetzel <garyhetzel@gmail.com>
 #
@@ -7,7 +7,7 @@
 #           Need to fix this for systems with multiple sinks
 #
 
-SINK=0
+SINK=`pactl list short sinks | grep RUNNING | cut -f1`
 STEP=3
 MAXVOL=65537 # let's just assume this is the same all over
 MUTED=0
