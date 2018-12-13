@@ -1,119 +1,124 @@
 #!/bin/bash
 # PulseAudio Volume Control Script
-#   2010-05-20 - Gary Hetzel <garyhetzel@gmail.com>
-#
-#   BUG:    Currently doesn't get information for the specified sink,
-#           but rather just uses the first sink it finds in list-sinks
-#           Need to fix this for systems with multiple sinks
-#
 
-SINK=`pactl list short sinks | grep RUNNING | cut -f1`
 STEP=3
-MAXVOL=65537 # let's just assume this is the same all over
-MUTED=0
 #MAXVOL=`pacmd list-sinks | grep "volume steps" | cut -d: -f2 | tr -d "[:space:]"`
+MAXVOL=65537 # let's just assume this is the same all over
 
-MUTED=`pacmd list-sinks 0 | grep muted | cut -d ' ' -f 2`
+#SINK=`pactl list short sinks | grep -m1 RUNNING | cut -f1`
+SINK=$( pactl list short sinks | sed -e 's,^\([0-9][0-9]*\)[^0-9].*,\1,' | head -n 1 )
+#SINK=0
+
 #VOLPERC=`pactl list sinks | awk '/Volume: 0:/ {print substr($3, 1, index($3, "%") - 1)}' | head -n1`
-VOLPERC=`pactl list sinks | awk '/Volume: front-left:/ {print substr($5, 1, index($5, "%") - 1)}'`
-SKIPOVERCHECK=0 # 1 : to increase volume beyond 100%
+#VOLPERC=`pactl list sinks | awk '/Volume: front-left:/ {print substr($5, 1, index($5, "%") - 1)}'`
+#MUTED=($( pacmd list-sinks | grep -m1 muted | cut -d ' ' -f 2 ))
+MUTED=$( pactl list sinks | grep '^[[:space:]]Mute:' | head -n $(( $SINK + 1 )) | tail -n 1 | awk 'NF>1{print $NF}' )
+VOLPERC=$( pactl list sinks | grep '^[[:space:]]Volume:' | head -n $(( $SINK + 1 )) | tail -n 1 | sed -e 's,.* \([0-9][0-9]*\)%.*,\1,' )
+
+LIMITVOL=0 # default max-100%
+
+# TODO
+# Add support for sink# > 1
+# parse for overlimit, sink, etc (link -parser- https://unix.stackexchange.com/a/321128) 
 
 display(){
-  if [ "$MUTED" = "yes" ]; then
-    echo "🔇 -muted-"
-  elif [ "$VOLPERC" -lt 33 ]; then
-    echo "🔈 ${VOLPERC}%"
-  elif [ "$VOLPERC" -lt 66 ]; then
-    echo "🔉 ${VOLPERC}%"
-  else
-    echo "🔊 ${VOLPERC}%"
-  fi
+    if [[ "$MUTED" == "yes" ]]; then
+        SYM='\U1F507'
+    elif [ "$VOLPERC" -lt 1 ]; then
+        SYM='\U1F507'
+    elif [ "$VOLPERC" -lt 33 ]; then
+        SYM='\U1F508'
+    elif [ "$VOLPERC" -lt 66 ]; then
+        SYM='\U1F509'
+    else
+        SYM='\U1F50A'
+    fi
+    echo "$SINK $(printf $SYM) ${VOLPERC}%"
 }
 
 up(){
-	VOLSTEP="$(( $VOLPERC+$STEP ))";
+    VOLSTEP="$(( $VOLPERC+$STEP ))";
 }
 
 down(){
-	VOLSTEP="$(( $VOLPERC-$STEP ))";
+    VOLSTEP="$(( $VOLPERC-$STEP ))";
 }
 
 max(){
-	pacmd set-sink-volume $SINK $MAXVOL > /dev/null
+    pacmd set-sink-volume $SINK $MAXVOL > /dev/null
 }
 
 min(){
-	pacmd set-sink-volume $SINK 0 > /dev/null
+    pacmd set-sink-volume $SINK 0 > /dev/null
 }
 
 overmax(){
-	SKIPOVERCHECK=1
-	if [ $VOLPERC -lt 100 ]; then
-		max;
-		exit 0;
-	fi
-	up
+    LIMITVOL=1
+    if [ $VOLPERC -lt 100 ]; then
+        max;
+        exit 0;
+    fi
+    up
 }
 
 mute(){
-	pacmd set-sink-mute $SINK 1 > /dev/null
+    pacmd set-sink-mute $SINK 1 > /dev/null
 }
 
 unmute(){
-	pacmd set-sink-mute $SINK 0 > /dev/null
+    pacmd set-sink-mute $SINK 0 > /dev/null
 }
 
 toggle(){
-	M=`pacmd list-sinks | grep "muted" | cut -d: -f2 | tr -d "[:space:]"`
-	if [ "$M" = "no" ]; then
-		mute;
-	else
-		unmute;
-	fi
+    if [[ "$MUTED" == "no" ]]; then
+        mute;
+    else
+        unmute;
+    fi
 }
 
 case $1 in
-up)
-	unmute;
-	up;;
-down)
-	unmute;
-	down;;
-max)
-	max
-	exit 0;;
-min)
-	min
-	exit 0;;
-overmax)
-	overmax;;
-toggle)
-	toggle
-	exit 0;;
-mute)
-	mute;
-	exit 0;;
-unmute)
-	unmute;
-	exit 0;;
-display)
-	display;
-	exit 0;;
-*)
-	echo "Usage: `basename $0` [up|down|min|max|overmax|toggle|mute|unmute|display]"
-	exit 1;;
-esac
+    up)
+        unmute;
+        up;;
+    down)
+        unmute;
+        down;;
+    max)
+        max
+        exit 0;;
+    min)
+        min
+        exit 0;;
+    overmax)
+        overmax;;
+    toggle)
+        toggle
+        exit 0;;
+    mute)
+        mute;
+        exit 0;;
+    unmute)
+        unmute;
+        exit 0;;
+    display)
+        display;
+        exit 0;;
+    *)
+        echo "Usage: `basename $0` [up|down|min|max|overmax|toggle|mute|unmute|display]"
+        exit 1;;
+    esac
 
 VOLUME="$(( ($MAXVOL/100) * $VOLSTEP ))"
 
 #echo "$VOLUME : $OVERMAX"
 
-if [ $SKIPOVERCHECK = 0 ]; then
-	if [ $VOLUME -gt $MAXVOL ]; then
- 		VOLUME=$MAXVOL
- 	elif [ $VOLUME -lt 0 ]; then
- 		VOLUME=0
- 	fi
+if [ $LIMITVOL = 0 ]; then
+    if [ $VOLUME -gt $MAXVOL ]; then
+        VOLUME=$MAXVOL
+    elif [ $VOLUME -lt 0 ]; then
+        VOLUME=0
+    fi
 fi
 
 #echo "$VOLUME: $MAXVOL/100 * $VOLPERC+$VOLSTEP"
