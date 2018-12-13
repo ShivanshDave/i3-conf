@@ -1,1 +1,4 @@
 /_local*
+temp*
+*.swp
+*.save
